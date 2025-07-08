@@ -46,8 +46,8 @@ interface HeatmapProps {
 
 ## Planned Versions
 
-### v1.1.0 - Animation & Interaction Update (Q2 2025) 🚧
-**Status:** Planned - Next Priority Release
+### v1.1.0 - Animation & Interaction Update (2025-01-08) ✅
+**Status:** Released
 
 **Major Features:**
 - 🎬 **Advanced Animation System**

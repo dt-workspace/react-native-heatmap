@@ -409,3 +409,9 @@ export function throttle<T extends (...args: any[]) => any>(
     }
   };
 }
+
+// Export animation utilities
+export * from './animation';
+
+// Export gesture utilities
+export * from './gestures';
