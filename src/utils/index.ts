@@ -7,6 +7,13 @@ import type {
   ProcessedCellData,
   ColorScheme,
   CalendarLayoutData,
+  DailyLayoutData,
+  WeeklyLayoutData,
+  MonthlyLayoutData,
+  YearlyLayoutData,
+  CustomRangeLayoutData,
+  TimelineScrollLayoutData,
+  RealTimeLayoutData,
 } from '../types';
 import { COLOR_SCHEMES } from '../types';
 
@@ -346,7 +353,18 @@ export function calculateHeatmapDimensions(
   processedData: ProcessedCellData[],
   cellSize: number,
   cellSpacing: number,
-  layout: 'calendar' | 'grid' | 'compact' | 'custom' = 'calendar',
+  layout:
+    | 'calendar'
+    | 'grid'
+    | 'compact'
+    | 'custom'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'yearly'
+    | 'customRange'
+    | 'timelineScroll'
+    | 'realTime' = 'calendar',
   gridDimensions?: { columns: number; rows: number }
 ): { width: number; height: number } {
   if (layout === 'calendar') {
@@ -363,6 +381,59 @@ export function calculateHeatmapDimensions(
   if (layout === 'compact') {
     return {
       width: processedData.length * (cellSize + cellSpacing) - cellSpacing,
+      height: cellSize,
+    };
+  }
+
+  if (layout === 'daily') {
+    return {
+      width: 24 * (cellSize + cellSpacing) - cellSpacing, // 24 hours
+      height: cellSize,
+    };
+  }
+
+  if (layout === 'weekly') {
+    return {
+      width: 7 * (cellSize + cellSpacing) - cellSpacing, // 7 days
+      height: cellSize,
+    };
+  }
+
+  if (layout === 'monthly') {
+    return {
+      width: 7 * (cellSize + cellSpacing) - cellSpacing, // 7 days per week
+      height: 6 * (cellSize + cellSpacing) - cellSpacing, // Max 6 weeks per month
+    };
+  }
+
+  if (layout === 'yearly') {
+    return {
+      width: 12 * 8 * (cellSize + cellSpacing) - cellSpacing, // 12 months, ~8 cells per month
+      height: 7 * (cellSize + cellSpacing) - cellSpacing, // 7 days per week
+    };
+  }
+
+  if (layout === 'customRange') {
+    return {
+      width: processedData.length * (cellSize + cellSpacing) - cellSpacing,
+      height: cellSize,
+    };
+  }
+
+  if (layout === 'timelineScroll') {
+    // Calculate based on scroll direction
+    const chunkSize = 24; // Default chunk size
+    const chunks = Math.ceil(processedData.length / chunkSize);
+    return {
+      width: chunks * (cellSize + cellSpacing) - cellSpacing,
+      height: chunkSize * (cellSize + cellSpacing) - cellSpacing,
+    };
+  }
+
+  if (layout === 'realTime') {
+    const windowSize = 24; // Default window size
+    return {
+      width: windowSize * (cellSize + cellSpacing) - cellSpacing,
       height: cellSize,
     };
   }
@@ -408,6 +479,436 @@ export function throttle<T extends (...args: any[]) => any>(
       setTimeout(() => (inThrottle = false), limit);
     }
   };
+}
+
+/**
+ * ===============================
+ * TIME-BASED LAYOUT UTILITIES
+ * ===============================
+ */
+
+/**
+ * Calculate daily layout (24-hour grid)
+ */
+export function calculateDailyLayout(
+  processedData: ProcessedCellData[],
+  targetDate: Date,
+  timeFormat: '12h' | '24h' = '24h'
+): DailyLayoutData {
+  const targetDateStr = formatDateISO(targetDate);
+
+  // Filter data for the target date
+  const dayData = processedData.filter((cell) => cell.date === targetDateStr);
+
+  // Create hour boundaries
+  const timeBoundaries = [];
+  for (let hour = 0; hour < 24; hour++) {
+    const hourStr =
+      timeFormat === '12h' ? formatHour12(hour) : formatHour24(hour);
+
+    timeBoundaries.push({
+      hour: hourStr,
+      x: hour,
+      width: 1,
+    });
+  }
+
+  // Organize data by hour
+  const hourlyData = new Array(24).fill(null).map((_, hour) => {
+    const hourData = dayData.find((cell) => {
+      const cellDate = parseISODate(cell.date);
+      return cellDate.getHours() === hour;
+    });
+
+    return (
+      hourData ||
+      ({
+        date: `${targetDateStr}T${hour.toString().padStart(2, '0')}:00:00`,
+        value: 0,
+        x: hour,
+        y: 0,
+        color: '#f0f0f0',
+        isEmpty: true,
+        normalizedValue: 0,
+      } as ProcessedCellData)
+    );
+  });
+
+  return {
+    hours: 24,
+    hourData: hourlyData,
+    timeBoundaries,
+  };
+}
+
+/**
+ * Calculate weekly layout (7-day activity)
+ */
+export function calculateWeeklyLayout(
+  processedData: ProcessedCellData[],
+  targetDate: Date
+): WeeklyLayoutData {
+  const startOfWeek = getStartOfWeek(targetDate);
+  const weekDates = [];
+
+  // Generate 7 days of the week
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    weekDates.push(formatDateISO(day));
+  }
+
+  // Create day boundaries
+  const dayBoundaries = weekDates.map((date, index) => ({
+    day: getDayName(parseISODate(date)),
+    x: index,
+    width: 1,
+  }));
+
+  // Organize data by day of week
+  const dayData = weekDates.map((date, index) => {
+    const cellData = processedData.find((cell) => cell.date === date);
+
+    return (
+      cellData ||
+      ({
+        date,
+        value: 0,
+        x: index,
+        y: 0,
+        color: '#f0f0f0',
+        isEmpty: true,
+        normalizedValue: 0,
+      } as ProcessedCellData)
+    );
+  });
+
+  return {
+    days: 7,
+    dayData,
+    dayBoundaries,
+  };
+}
+
+/**
+ * Calculate monthly layout
+ */
+export function calculateMonthlyLayout(
+  processedData: ProcessedCellData[],
+  targetDate: Date
+): MonthlyLayoutData {
+  const year = targetDate.getFullYear();
+  const month = targetDate.getMonth();
+
+  // Get first day of month and number of days
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startDayOfWeek = firstDay.getDay();
+
+  // Create month grid (weeks x days)
+  const weeks = Math.ceil((daysInMonth + startDayOfWeek) / 7);
+  const monthData: ProcessedCellData[][] = [];
+
+  for (let week = 0; week < weeks; week++) {
+    const weekData: ProcessedCellData[] = [];
+
+    for (let day = 0; day < 7; day++) {
+      const dayNumber = week * 7 + day - startDayOfWeek + 1;
+
+      if (dayNumber > 0 && dayNumber <= daysInMonth) {
+        const date = new Date(year, month, dayNumber);
+        const dateStr = formatDateISO(date);
+        const cellData = processedData.find((cell) => cell.date === dateStr);
+
+        weekData.push(
+          cellData ||
+            ({
+              date: dateStr,
+              value: 0,
+              x: day,
+              y: week,
+              color: '#f0f0f0',
+              isEmpty: true,
+              normalizedValue: 0,
+            } as ProcessedCellData)
+        );
+      } else {
+        // Empty cell for padding
+        weekData.push({
+          date: '',
+          value: 0,
+          x: day,
+          y: week,
+          color: 'transparent',
+          isEmpty: true,
+          normalizedValue: 0,
+        } as ProcessedCellData);
+      }
+    }
+
+    monthData.push(weekData);
+  }
+
+  // Create week boundaries
+  const weekBoundaries = Array.from({ length: weeks }, (_, index) => ({
+    week: index + 1,
+    x: 0,
+    width: 7,
+  }));
+
+  return {
+    daysInMonth,
+    monthData,
+    weekBoundaries,
+  };
+}
+
+/**
+ * Calculate yearly layout
+ */
+export function calculateYearlyLayout(
+  processedData: ProcessedCellData[],
+  targetDate: Date
+): YearlyLayoutData {
+  const year = targetDate.getFullYear();
+  const yearData: ProcessedCellData[][] = [];
+
+  // Process each month
+  for (let month = 0; month < 12; month++) {
+    const monthDate = new Date(year, month, 1);
+    const monthLayout = calculateMonthlyLayout(processedData, monthDate);
+    yearData.push(monthLayout.monthData.flat());
+  }
+
+  // Create month boundaries
+  const monthBoundaries = Array.from({ length: 12 }, (_, index) => {
+    const monthDate = new Date(year, index, 1);
+    return {
+      month: monthDate.toLocaleDateString('en-US', { month: 'short' }),
+      x: index * 8, // Approximate spacing
+      width: 7,
+    };
+  });
+
+  return {
+    months: 12,
+    yearData,
+    monthBoundaries,
+  };
+}
+
+/**
+ * Calculate custom range layout
+ */
+export function calculateCustomRangeLayout(
+  processedData: ProcessedCellData[],
+  startDate: Date,
+  endDate: Date,
+  granularity: 'hour' | 'day' | 'week' | 'month' = 'day'
+): CustomRangeLayoutData {
+  const rangeData: ProcessedCellData[] = [];
+  const periodBoundaries: Array<{
+    period: string;
+    x: number;
+    width: number;
+  }> = [];
+
+  let current = new Date(startDate);
+  let position = 0;
+
+  while (current <= endDate) {
+    let periodEnd: Date;
+    let periodLabel: string;
+
+    switch (granularity) {
+      case 'hour':
+        periodEnd = new Date(current);
+        periodEnd.setHours(current.getHours() + 1);
+        periodLabel = current.toLocaleTimeString('en-US', { hour: 'numeric' });
+        break;
+      case 'day':
+        periodEnd = new Date(current);
+        periodEnd.setDate(current.getDate() + 1);
+        periodLabel = current.toLocaleDateString('en-US', { day: 'numeric' });
+        break;
+      case 'week':
+        periodEnd = new Date(current);
+        periodEnd.setDate(current.getDate() + 7);
+        periodLabel = `W${getWeekNumber(current)}`;
+        break;
+      case 'month':
+        periodEnd = new Date(current);
+        periodEnd.setMonth(current.getMonth() + 1);
+        periodLabel = current.toLocaleDateString('en-US', { month: 'short' });
+        break;
+    }
+
+    // Find data for this period
+    const periodDataStr = formatDateISO(current);
+    const cellData = processedData.find((cell) => cell.date === periodDataStr);
+
+    rangeData.push(
+      cellData ||
+        ({
+          date: periodDataStr,
+          value: 0,
+          x: position,
+          y: 0,
+          color: '#f0f0f0',
+          isEmpty: true,
+          normalizedValue: 0,
+        } as ProcessedCellData)
+    );
+
+    periodBoundaries.push({
+      period: periodLabel,
+      x: position,
+      width: 1,
+    });
+
+    current = periodEnd;
+    position++;
+  }
+
+  return {
+    startDate,
+    endDate,
+    rangeData,
+    periodBoundaries,
+  };
+}
+
+/**
+ * Calculate timeline scroll layout
+ */
+export function calculateTimelineScrollLayout(
+  processedData: ProcessedCellData[],
+  scrollDirection: 'horizontal' | 'vertical' = 'horizontal',
+  chunkSize: number = 24
+): TimelineScrollLayoutData {
+  const timelineData: ProcessedCellData[][] = [];
+  const scrollMarkers: Array<{
+    timestamp: string;
+    position: number;
+    label: string;
+  }> = [];
+
+  // Sort data by date
+  const sortedData = [...processedData].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  // Group data into chunks
+  for (let i = 0; i < sortedData.length; i += chunkSize) {
+    const chunk = sortedData.slice(i, i + chunkSize);
+    timelineData.push(chunk);
+
+    // Add scroll marker for each chunk
+    if (chunk.length > 0 && chunk[0]) {
+      scrollMarkers.push({
+        timestamp: chunk[0].date,
+        position: i,
+        label: new Date(chunk[0].date).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }),
+      });
+    }
+  }
+
+  const totalScrollSize =
+    scrollDirection === 'horizontal'
+      ? timelineData.length * chunkSize * 15 // Approximate cell width
+      : timelineData.length * chunkSize * 15; // Approximate cell height
+
+  return {
+    totalScrollSize,
+    timelineData,
+    scrollMarkers,
+  };
+}
+
+/**
+ * Calculate real-time layout
+ */
+export function calculateRealTimeLayout(
+  processedData: ProcessedCellData[],
+  windowSize: number = 24, // Number of time units to show
+  updateInterval: number = 1000 // Update interval in milliseconds
+): RealTimeLayoutData {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - windowSize * 60 * 60 * 1000); // windowSize hours ago
+
+  // Filter data for current window
+  const dataBuffer = processedData.filter((cell) => {
+    const cellDate = parseISODate(cell.date);
+    return cellDate >= windowStart && cellDate <= now;
+  });
+
+  // Create live indicators
+  const liveIndicators = dataBuffer.map((cell, index) => {
+    const cellDate = parseISODate(cell.date);
+    const isRecent = now.getTime() - cellDate.getTime() < updateInterval * 2;
+
+    return {
+      timestamp: cellDate,
+      position: index,
+      active: isRecent,
+    };
+  });
+
+  return {
+    currentWindow: {
+      start: windowStart,
+      end: now,
+    },
+    dataBuffer,
+    updateQueue: [], // Will be populated by real-time updates
+    liveIndicators,
+  };
+}
+
+/**
+ * ===============================
+ * HELPER FUNCTIONS
+ * ===============================
+ */
+
+/**
+ * Format hour in 12-hour format
+ */
+function formatHour12(hour: number): string {
+  if (hour === 0) return '12 AM';
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return '12 PM';
+  return `${hour - 12} PM`;
+}
+
+/**
+ * Format hour in 24-hour format
+ */
+function formatHour24(hour: number): string {
+  return `${hour.toString().padStart(2, '0')}:00`;
+}
+
+/**
+ * Get start of week (Sunday)
+ */
+function getStartOfWeek(date: Date): Date {
+  const start = new Date(date);
+  const day = start.getDay();
+  const diff = start.getDate() - day;
+  start.setDate(diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+/**
+ * Get day name
+ */
+function getDayName(date: Date): string {
+  return date.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
 // Export animation utilities

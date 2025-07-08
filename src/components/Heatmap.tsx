@@ -19,6 +19,13 @@ import {
   processHeatmapData,
   calculateHeatmapDimensions,
   calculateCalendarLayout,
+  calculateDailyLayout,
+  calculateWeeklyLayout,
+  calculateMonthlyLayout,
+  calculateYearlyLayout,
+  calculateCustomRangeLayout,
+  calculateTimelineScrollLayout,
+  calculateRealTimeLayout,
   DEFAULT_ANIMATION_CONFIG,
   mergeAnimationConfig,
   DEFAULT_GESTURE_CONFIG,
@@ -88,6 +95,13 @@ const Heatmap: React.FC<HeatmapProps> = (props) => {
     // legendPosition = 'bottom',
     columns,
     rows,
+    // New time-based layout props
+    targetDate,
+    hourFormat = '24h',
+    showTimeLabels = false,
+    scrollDirection = 'horizontal',
+    updateInterval = 1000,
+    customRange,
     style,
     cellStyle,
     labelStyle,
@@ -183,7 +197,15 @@ const Heatmap: React.FC<HeatmapProps> = (props) => {
       dateRange.start,
       dateRange.end,
       colorScheme,
-      layout
+      layout === 'daily' ||
+        layout === 'weekly' ||
+        layout === 'monthly' ||
+        layout === 'yearly' ||
+        layout === 'customRange' ||
+        layout === 'timelineScroll' ||
+        layout === 'realTime'
+        ? 'grid'
+        : layout
     );
   }, [data, dateRange.start, dateRange.end, colorScheme, layout]);
 
@@ -194,6 +216,64 @@ const Heatmap: React.FC<HeatmapProps> = (props) => {
     }
     return null;
   }, [processedData, dateRange.start, layout]);
+
+  // Calculate time-based layouts
+  const timeBasedLayouts = useMemo(() => {
+    const currentDate = targetDate || new Date();
+
+    switch (layout) {
+      case 'daily':
+        return {
+          daily: calculateDailyLayout(processedData, currentDate, hourFormat),
+        };
+      case 'weekly':
+        return {
+          weekly: calculateWeeklyLayout(processedData, currentDate),
+        };
+      case 'monthly':
+        return {
+          monthly: calculateMonthlyLayout(processedData, currentDate),
+        };
+      case 'yearly':
+        return {
+          yearly: calculateYearlyLayout(processedData, currentDate),
+        };
+      case 'customRange':
+        if (customRange) {
+          return {
+            customRange: calculateCustomRangeLayout(
+              processedData,
+              customRange.start,
+              customRange.end,
+              customRange.granularity
+            ),
+          };
+        }
+        return null;
+      case 'timelineScroll':
+        return {
+          timelineScroll: calculateTimelineScrollLayout(
+            processedData,
+            scrollDirection,
+            24 // Default chunk size
+          ),
+        };
+      case 'realTime':
+        return {
+          realTime: calculateRealTimeLayout(processedData, 24, updateInterval),
+        };
+      default:
+        return null;
+    }
+  }, [
+    layout,
+    processedData,
+    targetDate,
+    hourFormat,
+    customRange,
+    scrollDirection,
+    updateInterval,
+  ]);
 
   // Calculate dimensions
   const dimensions = useMemo(() => {
@@ -435,14 +515,197 @@ const Heatmap: React.FC<HeatmapProps> = (props) => {
     labelStyle,
   ]);
 
+  // Render time-based labels
+  const renderTimeBasedLabels = useCallback(() => {
+    if (!showTimeLabels || !timeBasedLayouts) {
+      return null;
+    }
+
+    const labels = [];
+
+    // Daily layout - hour labels
+    if (layout === 'daily' && timeBasedLayouts.daily) {
+      const hourLabels = timeBasedLayouts.daily.timeBoundaries.map(
+        (boundary, index) => {
+          const x = boundary.x * (cellSize + cellSpacing);
+          const y = -mergedTheme.typography.fontSize - 5;
+
+          return (
+            <SvgText
+              key={`hour-${index}`}
+              x={x}
+              y={y}
+              fontSize={mergedTheme.typography.fontSize}
+              fontFamily={mergedTheme.typography.fontFamily}
+              fontWeight={mergedTheme.typography.fontWeight}
+              fill={mergedTheme.colors.text}
+              {...labelStyle}
+            >
+              {boundary.hour}
+            </SvgText>
+          );
+        }
+      );
+      labels.push(...hourLabels);
+    }
+
+    // Weekly layout - day labels
+    if (layout === 'weekly' && timeBasedLayouts.weekly) {
+      const dayLabels = timeBasedLayouts.weekly.dayBoundaries.map(
+        (boundary, index) => {
+          const x = boundary.x * (cellSize + cellSpacing);
+          const y = -mergedTheme.typography.fontSize - 5;
+
+          return (
+            <SvgText
+              key={`day-${index}`}
+              x={x}
+              y={y}
+              fontSize={mergedTheme.typography.fontSize}
+              fontFamily={mergedTheme.typography.fontFamily}
+              fontWeight={mergedTheme.typography.fontWeight}
+              fill={mergedTheme.colors.text}
+              {...labelStyle}
+            >
+              {boundary.day}
+            </SvgText>
+          );
+        }
+      );
+      labels.push(...dayLabels);
+    }
+
+    // Monthly layout - week labels
+    if (layout === 'monthly' && timeBasedLayouts.monthly) {
+      const weekLabels = timeBasedLayouts.monthly.weekBoundaries.map(
+        (boundary, index) => {
+          const x = -mergedTheme.typography.fontSize - 5;
+          const y = boundary.week * (cellSize + cellSpacing) + cellSize / 2;
+
+          return (
+            <SvgText
+              key={`week-${index}`}
+              x={x}
+              y={y}
+              fontSize={mergedTheme.typography.fontSize}
+              fontFamily={mergedTheme.typography.fontFamily}
+              fontWeight={mergedTheme.typography.fontWeight}
+              fill={mergedTheme.colors.text}
+              {...labelStyle}
+            >
+              {`W${boundary.week}`}
+            </SvgText>
+          );
+        }
+      );
+      labels.push(...weekLabels);
+    }
+
+    // Yearly layout - month labels
+    if (layout === 'yearly' && timeBasedLayouts.yearly) {
+      const monthLabels = timeBasedLayouts.yearly.monthBoundaries.map(
+        (boundary, index) => {
+          const x = boundary.x * (cellSize + cellSpacing);
+          const y = -mergedTheme.typography.fontSize - 5;
+
+          return (
+            <SvgText
+              key={`month-${index}`}
+              x={x}
+              y={y}
+              fontSize={mergedTheme.typography.fontSize}
+              fontFamily={mergedTheme.typography.fontFamily}
+              fontWeight={mergedTheme.typography.fontWeight}
+              fill={mergedTheme.colors.text}
+              {...labelStyle}
+            >
+              {boundary.month}
+            </SvgText>
+          );
+        }
+      );
+      labels.push(...monthLabels);
+    }
+
+    // Custom range layout - period labels
+    if (layout === 'customRange' && timeBasedLayouts.customRange) {
+      const periodLabels = timeBasedLayouts.customRange.periodBoundaries.map(
+        (boundary, index) => {
+          const x = boundary.x * (cellSize + cellSpacing);
+          const y = -mergedTheme.typography.fontSize - 5;
+
+          return (
+            <SvgText
+              key={`period-${index}`}
+              x={x}
+              y={y}
+              fontSize={mergedTheme.typography.fontSize}
+              fontFamily={mergedTheme.typography.fontFamily}
+              fontWeight={mergedTheme.typography.fontWeight}
+              fill={mergedTheme.colors.text}
+              {...labelStyle}
+            >
+              {boundary.period}
+            </SvgText>
+          );
+        }
+      );
+      labels.push(...periodLabels);
+    }
+
+    // Timeline scroll layout - scroll markers
+    if (layout === 'timelineScroll' && timeBasedLayouts.timelineScroll) {
+      const scrollLabels = timeBasedLayouts.timelineScroll.scrollMarkers.map(
+        (marker, index) => {
+          const x = marker.position * (cellSize + cellSpacing);
+          const y = -mergedTheme.typography.fontSize - 5;
+
+          return (
+            <SvgText
+              key={`scroll-${index}`}
+              x={x}
+              y={y}
+              fontSize={mergedTheme.typography.fontSize}
+              fontFamily={mergedTheme.typography.fontFamily}
+              fontWeight={mergedTheme.typography.fontWeight}
+              fill={mergedTheme.colors.text}
+              {...labelStyle}
+            >
+              {marker.label}
+            </SvgText>
+          );
+        }
+      );
+      labels.push(...scrollLabels);
+    }
+
+    return labels;
+  }, [
+    showTimeLabels,
+    layout,
+    timeBasedLayouts,
+    cellSize,
+    cellSpacing,
+    mergedTheme.typography,
+    mergedTheme.colors.text,
+    labelStyle,
+  ]);
+
   // Calculate SVG viewBox with padding for labels
   const viewBoxPadding = {
     left:
-      showWeekdayLabels && layout === 'calendar'
+      (showWeekdayLabels && layout === 'calendar') ||
+      (showTimeLabels && (layout === 'monthly' || layout === 'yearly'))
         ? mergedTheme.typography.fontSize + 10
         : 0,
     top:
-      showMonthLabels && layout === 'calendar'
+      (showMonthLabels && layout === 'calendar') ||
+      (showTimeLabels &&
+        (layout === 'daily' ||
+          layout === 'weekly' ||
+          layout === 'yearly' ||
+          layout === 'customRange' ||
+          layout === 'timelineScroll'))
         ? mergedTheme.typography.fontSize + 10
         : 0,
   };
@@ -471,6 +734,7 @@ const Heatmap: React.FC<HeatmapProps> = (props) => {
         <G>
           {renderMonthLabels()}
           {renderWeekdayLabels()}
+          {renderTimeBasedLabels()}
           {processedData.map(renderCell)}
         </G>
       </Svg>
