@@ -3,6 +3,7 @@
  */
 
 import type { ReactNode } from 'react';
+import type { ViewStyle, TextStyle } from 'react-native';
 
 /**
  * Base data structure for heatmap cells
@@ -136,7 +137,18 @@ export interface TooltipConfig {
 /**
  * Layout configuration options
  */
-export type LayoutType = 'calendar' | 'grid' | 'compact' | 'custom';
+export type LayoutType =
+  | 'calendar'
+  | 'grid'
+  | 'compact'
+  | 'custom'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'yearly'
+  | 'customRange'
+  | 'timelineScroll'
+  | 'realTime';
 
 /**
  * Gesture configuration
@@ -191,6 +203,8 @@ export interface HeatmapProps {
   colorScheme?: ColorScheme | string;
   /** Theme configuration */
   theme?: Partial<Theme>;
+  /** Time-based layout configuration */
+  timeLayoutConfig?: Partial<TimeLayoutConfig>;
 
   /** Date range */
   /** Start date for calendar layout */
@@ -257,6 +271,26 @@ export interface HeatmapProps {
   /** Number of rows (grid layout) */
   rows?: number;
 
+  /** Time-based layout configuration */
+  /** Target date for daily/weekly layouts */
+  targetDate?: Date;
+  /** Time zone for time-based layouts */
+  timeZone?: string;
+  /** Hour format for daily layouts */
+  hourFormat?: '12h' | '24h';
+  /** Show time labels */
+  showTimeLabels?: boolean;
+  /** Scroll direction for timeline layouts */
+  scrollDirection?: 'horizontal' | 'vertical';
+  /** Real-time update interval (milliseconds) */
+  updateInterval?: number;
+  /** Custom range configuration */
+  customRange?: {
+    start: Date;
+    end: Date;
+    granularity: 'hour' | 'day' | 'week' | 'month';
+  };
+
   /** Performance */
   /** Enable virtualization for large datasets */
   virtualized?: boolean;
@@ -307,6 +341,326 @@ export interface CalendarLayoutData {
     width: number;
   }>;
 }
+
+/**
+ * Time-based layout configurations
+ */
+export interface TimeLayoutConfig {
+  /** Time zone for time-based layouts */
+  timeZone?: string;
+  /** Format for time labels */
+  timeFormat?: '12h' | '24h';
+  /** Show time labels */
+  showTimeLabels?: boolean;
+  /** Show date labels */
+  showDateLabels?: boolean;
+  /** Scroll direction for timeline layouts */
+  scrollDirection?: 'horizontal' | 'vertical';
+  /** Auto-scroll for real-time layouts */
+  autoScroll?: boolean;
+  /** Update interval for real-time layouts (in milliseconds) */
+  updateInterval?: number;
+}
+
+/**
+ * Daily layout specific data (24-hour grid)
+ */
+export interface DailyLayoutData {
+  /** Hours in the day (0-23) */
+  hours: number;
+  /** Hour data organized by hour */
+  hourData: ProcessedCellData[];
+  /** Time boundaries */
+  timeBoundaries: Array<{
+    hour: string;
+    x: number;
+    width: number;
+  }>;
+}
+
+/**
+ * Weekly layout specific data (7-day activity)
+ */
+export interface WeeklyLayoutData {
+  /** Days in the week (0-6) */
+  days: number;
+  /** Day data organized by day of week */
+  dayData: ProcessedCellData[];
+  /** Day boundaries */
+  dayBoundaries: Array<{
+    day: string;
+    x: number;
+    width: number;
+  }>;
+}
+
+/**
+ * Monthly layout specific data
+ */
+export interface MonthlyLayoutData {
+  /** Days in the month */
+  daysInMonth: number;
+  /** Month data organized by day */
+  monthData: ProcessedCellData[][];
+  /** Week boundaries */
+  weekBoundaries: Array<{
+    week: number;
+    x: number;
+    width: number;
+  }>;
+}
+
+/**
+ * Yearly layout specific data
+ */
+export interface YearlyLayoutData {
+  /** Months in the year */
+  months: number;
+  /** Year data organized by month */
+  yearData: ProcessedCellData[][];
+  /** Month boundaries */
+  monthBoundaries: Array<{
+    month: string;
+    x: number;
+    width: number;
+  }>;
+}
+
+/**
+ * Custom range layout specific data
+ */
+export interface CustomRangeLayoutData {
+  /** Start date of the range */
+  startDate: Date;
+  /** End date of the range */
+  endDate: Date;
+  /** Range data organized by time period */
+  rangeData: ProcessedCellData[];
+  /** Time period boundaries */
+  periodBoundaries: Array<{
+    period: string;
+    x: number;
+    width: number;
+  }>;
+}
+
+/**
+ * Timeline scroll layout specific data
+ */
+export interface TimelineScrollLayoutData {
+  /** Total scroll width/height */
+  totalScrollSize: number;
+  /** Timeline data organized by time chunks */
+  timelineData: ProcessedCellData[][];
+  /** Scroll position markers */
+  scrollMarkers: Array<{
+    timestamp: string;
+    position: number;
+    label: string;
+  }>;
+}
+
+/**
+ * Real-time layout specific data
+ */
+export interface RealTimeLayoutData {
+  /** Current time window */
+  currentWindow: {
+    start: Date;
+    end: Date;
+  };
+  /** Real-time data buffer */
+  dataBuffer: ProcessedCellData[];
+  /** Update queue for new data */
+  updateQueue: ProcessedCellData[];
+  /** Live indicators */
+  liveIndicators: Array<{
+    timestamp: Date;
+    position: number;
+    active: boolean;
+  }>;
+}
+
+/**
+ * CardLayout component interfaces
+ */
+
+/**
+ * Badge component configuration
+ */
+export interface BadgeConfig {
+  /** Badge text */
+  text: string;
+  /** Badge color */
+  color?: string;
+  /** Badge background color */
+  backgroundColor?: string;
+  /** Badge size */
+  size?: 'small' | 'medium' | 'large';
+  /** Badge style */
+  style?: ViewStyle;
+  /** Badge text style */
+  textStyle?: TextStyle;
+}
+
+/**
+ * Card section configuration
+ */
+export interface CardSectionConfig {
+  /** Whether the section is visible */
+  visible?: boolean;
+  /** Section order/position */
+  order?: number;
+  /** Section style */
+  style?: ViewStyle;
+  /** Section padding */
+  padding?: number;
+  /** Section margin */
+  margin?: number;
+}
+
+/**
+ * Card layout configuration
+ */
+export interface CardLayoutConfig {
+  /** Card width */
+  width?: number;
+  /** Card height */
+  height?: number;
+  /** Card background color */
+  backgroundColor?: string;
+  /** Card border color */
+  borderColor?: string;
+  /** Card border width */
+  borderWidth?: number;
+  /** Card border radius */
+  borderRadius?: number;
+  /** Card shadow */
+  shadow?: boolean;
+  /** Card elevation (Android) */
+  elevation?: number;
+  /** Card padding */
+  padding?: number;
+  /** Card margin */
+  margin?: number;
+  /** Card style */
+  style?: ViewStyle;
+}
+
+/**
+ * Card Layout component props
+ */
+export interface CardLayoutProps {
+  /** Title - can be string or custom component */
+  title?: string | ReactNode;
+  /** Title style */
+  titleStyle?: TextStyle;
+  /** Title container style */
+  titleContainerStyle?: ViewStyle;
+  /** Title section configuration */
+  titleSection?: CardSectionConfig;
+
+  /** Description - can be string or custom component */
+  description?: string | ReactNode;
+  /** Description style */
+  descriptionStyle?: TextStyle;
+  /** Description container style */
+  descriptionContainerStyle?: ViewStyle;
+  /** Description section configuration */
+  descriptionSection?: CardSectionConfig;
+
+  /** Badges component - optional */
+  badges?: ReactNode;
+  /** Badges array for default badge renderer */
+  badgesArray?: BadgeConfig[];
+  /** Badges container style */
+  badgesContainerStyle?: ViewStyle;
+  /** Badges section configuration */
+  badgesSection?: CardSectionConfig;
+
+  /** Custom component - fully customizable area */
+  customComponent?: ReactNode;
+  /** Custom component container style */
+  customComponentContainerStyle?: ViewStyle;
+  /** Custom component section configuration */
+  customComponentSection?: CardSectionConfig;
+
+  /** Hitman (footer/action) - always rendered at the end */
+  hitman?: ReactNode;
+  /** Hitman container style */
+  hitmanContainerStyle?: ViewStyle;
+  /** Hitman section configuration */
+  hitmanSection?: CardSectionConfig;
+
+  /** Card layout configuration */
+  cardLayout?: CardLayoutConfig;
+
+  /** Accessibility */
+  /** Accessibility label */
+  accessibilityLabel?: string;
+  /** Accessibility hint */
+  accessibilityHint?: string;
+  /** Accessibility role */
+  accessibilityRole?: string;
+
+  /** Interaction handlers */
+  /** Called when card is pressed */
+  onPress?: () => void;
+  /** Called when card is long pressed */
+  onLongPress?: () => void;
+
+  /** Animation */
+  /** Enable card animations */
+  animated?: boolean;
+  /** Animation duration */
+  animationDuration?: number;
+  /** Animation type */
+  animationType?: 'fade' | 'scale' | 'slide';
+
+  /** Theme */
+  /** Theme mode */
+  theme?: 'light' | 'dark' | 'auto';
+  /** Custom theme colors */
+  themeColors?: {
+    background?: string;
+    text?: string;
+    border?: string;
+    shadow?: string;
+  };
+
+  /** Children (alternative to sections) */
+  children?: ReactNode;
+
+  /** Container style */
+  style?: ViewStyle;
+
+  /** Test ID for testing */
+  testID?: string;
+}
+
+/**
+ * Default card layout configuration
+ */
+export const DEFAULT_CARD_LAYOUT: CardLayoutConfig = {
+  backgroundColor: '#ffffff',
+  borderColor: '#e1e4e8',
+  borderWidth: 1,
+  borderRadius: 8,
+  shadow: true,
+  elevation: 2,
+  padding: 16,
+  margin: 8,
+};
+
+/**
+ * Default card section configuration
+ */
+export const DEFAULT_CARD_SECTION: CardSectionConfig = {
+  visible: true,
+  order: 0,
+  padding: 8,
+  margin: 4,
+};
 
 /**
  * Predefined color schemes
