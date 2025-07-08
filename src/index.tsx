@@ -1,6 +1,10 @@
 // Export main component
 export { default as Heatmap } from './components/Heatmap';
 
+// Export additional components
+export { default as Tooltip } from './components/Tooltip';
+export { default as AnimatedCell } from './components/AnimatedCell';
+
 // Export types
 export type {
   HeatmapProps,
@@ -10,6 +14,7 @@ export type {
   AccessibilityProps,
   AnimationConfig,
   TooltipConfig,
+  GestureConfig,
   ProcessedCellData,
   CalendarLayoutData,
   LayoutType,

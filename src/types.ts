@@ -99,6 +99,10 @@ export interface AnimationConfig {
   easing?: 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
   /** Stagger delay between cell animations */
   staggerDelay?: number;
+  /** Entry animation type */
+  entryAnimation?: 'fade' | 'scale' | 'slide' | 'none';
+  /** Use native driver for performance */
+  useNativeDriver?: boolean;
 }
 
 /**
@@ -115,12 +119,44 @@ export interface TooltipConfig {
   offset?: number;
   /** Show tooltip arrow */
   showArrow?: boolean;
+  /** Tooltip background color */
+  backgroundColor?: string;
+  /** Tooltip text color */
+  textColor?: string;
+  /** Tooltip font size */
+  fontSize?: number;
+  /** Tooltip padding */
+  padding?: number;
+  /** Tooltip border radius */
+  borderRadius?: number;
+  /** Tooltip shadow */
+  shadow?: boolean;
 }
 
 /**
  * Layout configuration options
  */
 export type LayoutType = 'calendar' | 'grid' | 'compact' | 'custom';
+
+/**
+ * Gesture configuration
+ */
+export interface GestureConfig {
+  /** Enable/disable gestures */
+  enabled: boolean;
+  /** Enable pan gesture */
+  pan?: boolean;
+  /** Enable zoom gesture */
+  zoom?: boolean;
+  /** Enable swipe gesture */
+  swipe?: boolean;
+  /** Minimum zoom scale */
+  minZoom?: number;
+  /** Maximum zoom scale */
+  maxZoom?: number;
+  /** Haptic feedback on touch */
+  hapticFeedback?: boolean;
+}
 
 /**
  * Cell shape options
@@ -173,6 +209,8 @@ export interface HeatmapProps {
   onCellPressIn?: (data: HeatmapData, index: number) => void;
   /** Called when a cell is pressed out */
   onCellPressOut?: (data: HeatmapData, index: number) => void;
+  /** Called when a cell is double pressed */
+  onCellDoublePress?: (data: HeatmapData, index: number) => void;
 
   /** Tooltip configuration */
   /** Tooltip settings */
@@ -189,6 +227,15 @@ export interface HeatmapProps {
   animation?: Partial<AnimationConfig>;
   /** Legacy: animation duration (use animation.duration instead) */
   animationDuration?: number;
+
+  /** Gesture configuration */
+  gesture?: Partial<GestureConfig>;
+  /** Enable pan gesture */
+  panEnabled?: boolean;
+  /** Enable zoom gesture */
+  zoomEnabled?: boolean;
+  /** Enable haptic feedback */
+  hapticFeedback?: boolean;
 
   /** Accessibility */
   /** Accessibility configuration */
@@ -386,6 +433,32 @@ export const COLOR_SCHEMES: Record<string, ColorScheme> = {
       '#252525',
     ],
     emptyColor: '#ffffff',
+  },
+  // New color schemes for v1.1.0
+  gitlab: {
+    name: 'gitlab',
+    colors: ['#fdf2e9', '#fad5a5', '#ee8f00', '#d16000', '#a04100'],
+    emptyColor: '#fdf2e9',
+  },
+  bitbucket: {
+    name: 'bitbucket',
+    colors: ['#e6f3ff', '#b3d9ff', '#4d94ff', '#0066cc', '#004d99'],
+    emptyColor: '#e6f3ff',
+  },
+  accessible: {
+    name: 'accessible',
+    colors: ['#ffffff', '#ffcc00', '#ff9900', '#ff6600', '#cc0000'],
+    emptyColor: '#ffffff',
+  },
+  neon: {
+    name: 'neon',
+    colors: ['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460', '#533483'],
+    emptyColor: '#0a0a0a',
+  },
+  sunset: {
+    name: 'sunset',
+    colors: ['#ffeaa7', '#fdcb6e', '#e17055', '#d63031', '#a29bfe'],
+    emptyColor: '#ffeaa7',
   },
 };
 
